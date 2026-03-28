@@ -1,0 +1,34 @@
+import { Request, Response } from 'express';
+import { feesService } from './fees.service.js';
+import { asyncHandler } from '../../shared/utils/asyncHandler.js';
+import { success } from '../../shared/utils/apiResponse.js';
+
+export const list = asyncHandler(async (req: Request, res: Response) => {
+  const result = await feesService.list(req.query as any);
+  success(res, result.fees, 'Fees retrieved', 200, result.meta);
+});
+
+export const getById = asyncHandler(async (req: Request, res: Response) => {
+  const fee = await feesService.getById(req.params.id);
+  success(res, fee);
+});
+
+export const create = asyncHandler(async (req: Request, res: Response) => {
+  const fee = await feesService.create(req.body);
+  success(res, fee, 'Fee record created', 201);
+});
+
+export const recordPayment = asyncHandler(async (req: Request, res: Response) => {
+  const fee = await feesService.recordPayment(req.params.id, req.body);
+  success(res, fee, 'Payment recorded');
+});
+
+export const waive = asyncHandler(async (req: Request, res: Response) => {
+  const fee = await feesService.waive(req.params.id, req.body.remarks);
+  success(res, fee, 'Fee waived');
+});
+
+export const getStudentBalance = asyncHandler(async (req: Request, res: Response) => {
+  const balance = await feesService.getStudentBalance(req.params.studentId);
+  success(res, balance);
+});
