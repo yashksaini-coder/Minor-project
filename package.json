@@ -5,9 +5,17 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "db:migrate": "pnpm --filter @campusphere/backend prisma migrate dev",
-    "db:seed": "pnpm --filter @campusphere/backend prisma db seed",
-    "db:studio": "pnpm --filter @campusphere/backend prisma studio"
+    "setup": "bash setup.sh",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "db:migrate": "cd apps/backend && npx prisma migrate dev",
+    "db:migrate:deploy": "cd apps/backend && npx prisma migrate deploy",
+    "db:seed": "cd apps/backend && npx prisma db seed",
+    "db:studio": "cd apps/backend && npx prisma studio",
+    "db:reset": "cd apps/backend && npx prisma migrate reset --force",
+    "typecheck": "turbo typecheck",
+    "typecheck:backend": "cd apps/backend && npx tsc --noEmit",
+    "typecheck:frontend": "cd apps/frontend && npx tsc --noEmit"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
