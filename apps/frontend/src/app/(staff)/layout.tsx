@@ -3,11 +3,12 @@
 import { AppSidebar, NavItem } from '@/components/shared/Sidebar';
 import { Topbar } from '@/components/shared/Topbar';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { LayoutDashboard, AlertTriangle, UserCheck } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, UserCheck, CalendarDays } from 'lucide-react';
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
   { label: 'Complaints', href: '/staff/complaints', icon: AlertTriangle },
+  { label: 'Attendance', href: '/staff/attendance', icon: CalendarDays },
   { label: 'Visitors', href: '/staff/visitors', icon: UserCheck },
 ];
 

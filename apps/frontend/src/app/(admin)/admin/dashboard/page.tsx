@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -30,8 +30,13 @@ import { AreaChartWrapper } from '@/components/charts/AreaChart';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { ProgressRing } from '@/components/charts/ProgressRing';
 import { OccupancyGrid } from '@/components/admin/OccupancyGrid';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth-store';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
@@ -212,7 +217,7 @@ const quickActions: QuickActionProps[] = [
     label: 'Broadcast Notice',
     description: 'Send announcement',
     icon: Megaphone,
-    href: '/admin/settings',
+    href: '#broadcast',
   },
 ];
 
@@ -264,6 +269,22 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const hostelId = useAuthStore((s) => s.user?.hostelId) ?? '';
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+
+  const broadcastMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/notifications/broadcast', { hostelId, title: broadcastTitle, message: broadcastMessage });
+    },
+    onSuccess: () => {
+      toast.success('Announcement sent to all residents');
+      setBroadcastOpen(false);
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+    },
+    onError: () => toast.error('Failed to send announcement'),
+  });
 
   /* ── data fetching ─────────────────────────────────────────────── */
 
@@ -463,7 +484,13 @@ export default function DashboardPage() {
             <h3 className="font-display text-base font-semibold px-1">Quick Actions</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {quickActions.map((action) => (
-                <QuickAction key={action.label} {...action} />
+                action.href === '#broadcast' ? (
+                  <div key={action.label} onClick={() => setBroadcastOpen(true)}>
+                    <QuickAction {...action} href="#" />
+                  </div>
+                ) : (
+                  <QuickAction key={action.label} {...action} />
+                )
               ))}
             </div>
           </div>
@@ -528,6 +555,32 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Broadcast Dialog */}
+      <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Send Announcement</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-title">Title</Label>
+              <Input id="broadcast-title" className="rounded-lg" placeholder="Announcement title" value={broadcastTitle} onChange={(e) => setBroadcastTitle(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="broadcast-message">Message</Label>
+              <Textarea id="broadcast-message" className="rounded-lg min-h-[100px]" placeholder="Write your announcement..." value={broadcastMessage} onChange={(e: any) => setBroadcastMessage(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBroadcastOpen(false)}>Cancel</Button>
+            <Button onClick={() => broadcastMutation.mutate()} disabled={!broadcastTitle || !broadcastMessage || broadcastMutation.isPending}>
+              <Megaphone className="h-4 w-4 mr-2" />
+              Send to All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
