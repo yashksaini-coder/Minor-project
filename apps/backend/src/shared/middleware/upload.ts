@@ -13,7 +13,14 @@ if (env.CLOUDINARY_CLOUD_NAME) {
 }
 
 const storage = multer.memoryStorage();
-export const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+export const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    cb(null, allowedMimeTypes.includes(file.mimetype));
+  },
+}); // 5MB, images only
 
 export async function uploadToCloudinary(buffer: Buffer, folder: string = 'complaints'): Promise<string> {
   return new Promise((resolve, reject) => {
