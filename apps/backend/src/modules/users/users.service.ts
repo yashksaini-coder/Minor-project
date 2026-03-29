@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database.js';
 import { Prisma } from '@prisma/client';
+import { AppError } from '../../shared/middleware/errorHandler.js';
 
 export class UsersService {
   async list(query: {
@@ -52,7 +53,7 @@ export class UsersService {
   async create(data: { email: string; password: string; name: string; phone?: string; role: string; hostelId: string }) {
     const bcrypt = await import('bcryptjs');
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) throw new Error('Email already registered');
+    if (existing) throw new AppError(409, 'Email already registered');
 
     const hashed = await bcrypt.default.hash(data.password, 12);
     const user = await prisma.user.create({

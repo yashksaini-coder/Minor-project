@@ -1,24 +1,35 @@
 import { prisma } from '../../config/database.js';
+import { Prisma } from '@prisma/client';
 
 export class ReportsService {
   async occupancyReport(hostelId: string) {
-    const rooms = await prisma.room.findMany({
-      where: { block: { hostelId } },
-      include: { beds: true },
-    });
+    // Use groupBy for room status counts instead of loading all rooms
+    const [roomStats, bedStats] = await Promise.all([
+      prisma.room.groupBy({
+        by: ['status'],
+        where: { block: { hostelId } },
+        _count: true,
+      }),
+      prisma.bed.groupBy({
+        by: ['status'],
+        where: { room: { block: { hostelId } } },
+        _count: true,
+      }),
+    ]);
 
-    const total = rooms.length;
-    const totalBeds = rooms.reduce((s, r) => s + r.beds.length, 0);
-    const occupiedBeds = rooms.reduce((s, r) => s + r.beds.filter((b) => b.status === 'OCCUPIED').length, 0);
+    const totalRooms = roomStats.reduce((s, r) => s + r._count, 0);
+    const totalBeds = bedStats.reduce((s, b) => s + b._count, 0);
+    const occupiedBeds = bedStats.find((b) => b.status === 'OCCUPIED')?._count ?? 0;
+
     const byStatus = {
-      available: rooms.filter((r) => r.status === 'AVAILABLE').length,
-      occupied: rooms.filter((r) => r.status === 'OCCUPIED').length,
-      partiallyOccupied: rooms.filter((r) => r.status === 'PARTIALLY_OCCUPIED').length,
-      underMaintenance: rooms.filter((r) => r.status === 'UNDER_MAINTENANCE').length,
+      available: roomStats.find((r) => r.status === 'AVAILABLE')?._count ?? 0,
+      occupied: roomStats.find((r) => r.status === 'OCCUPIED')?._count ?? 0,
+      partiallyOccupied: roomStats.find((r) => r.status === 'PARTIALLY_OCCUPIED')?._count ?? 0,
+      underMaintenance: roomStats.find((r) => r.status === 'UNDER_MAINTENANCE')?._count ?? 0,
     };
 
     return {
-      totalRooms: total,
+      totalRooms,
       totalBeds,
       occupiedBeds,
       vacantBeds: totalBeds - occupiedBeds,
@@ -28,50 +39,82 @@ export class ReportsService {
   }
 
   async feeReport(hostelId: string, startDate?: string, endDate?: string) {
-    const where: any = { hostelId };
+    const where: Prisma.FeeRecordWhereInput = { hostelId };
     if (startDate && endDate) {
       where.createdAt = { gte: new Date(startDate), lte: new Date(endDate) };
     }
 
-    const fees = await prisma.feeRecord.findMany({ where });
+    // Use aggregate and groupBy instead of loading all records
+    const [totals, statusCounts, byType] = await Promise.all([
+      prisma.feeRecord.aggregate({
+        where,
+        _sum: { amount: true, paidAmount: true },
+      }),
+      prisma.feeRecord.groupBy({
+        by: ['status'],
+        where,
+        _count: true,
+      }),
+      prisma.feeRecord.groupBy({
+        by: ['type'],
+        where,
+        _count: true,
+        _sum: { amount: true, paidAmount: true },
+      }),
+    ]);
 
-    const totalCharged = fees.reduce((s, f) => s + Number(f.amount), 0);
-    const totalCollected = fees.reduce((s, f) => s + Number(f.paidAmount), 0);
-    const overdue = fees.filter((f) => f.status === 'OVERDUE').length;
-    const pending = fees.filter((f) => f.status === 'PENDING').length;
+    const totalCharged = Number(totals._sum.amount ?? 0);
+    const totalCollected = Number(totals._sum.paidAmount ?? 0);
+    const overdue = statusCounts.find((s) => s.status === 'OVERDUE')?._count ?? 0;
+    const pending = statusCounts.find((s) => s.status === 'PENDING')?._count ?? 0;
 
-    const byType: Record<string, { count: number; amount: number; collected: number }> = {};
-    for (const fee of fees) {
-      if (!byType[fee.type]) byType[fee.type] = { count: 0, amount: 0, collected: 0 };
-      byType[fee.type].count++;
-      byType[fee.type].amount += Number(fee.amount);
-      byType[fee.type].collected += Number(fee.paidAmount);
+    const byTypeMap: Record<string, { count: number; amount: number; collected: number }> = {};
+    for (const t of byType) {
+      byTypeMap[t.type] = {
+        count: t._count,
+        amount: Number(t._sum.amount ?? 0),
+        collected: Number(t._sum.paidAmount ?? 0),
+      };
     }
 
-    return { totalCharged, totalCollected, outstandingBalance: totalCharged - totalCollected, overdue, pending, byType };
+    return { totalCharged, totalCollected, outstandingBalance: totalCharged - totalCollected, overdue, pending, byType: byTypeMap };
   }
 
   async complaintReport(hostelId: string) {
-    const complaints = await prisma.complaint.findMany({
-      where: { hostelId, deletedAt: null },
-    });
+    // Use groupBy for status and category counts
+    const [total, byStatus, byCategory, avgResolution] = await Promise.all([
+      prisma.complaint.count({ where: { hostelId, deletedAt: null } }),
+      prisma.complaint.groupBy({
+        by: ['status'],
+        where: { hostelId, deletedAt: null },
+        _count: true,
+      }),
+      prisma.complaint.groupBy({
+        by: ['category'],
+        where: { hostelId, deletedAt: null },
+        _count: true,
+      }),
+      // For avg resolution time, only load resolved complaints with minimal fields
+      prisma.complaint.findMany({
+        where: { hostelId, deletedAt: null, resolvedAt: { not: null } },
+        select: { createdAt: true, resolvedAt: true },
+      }),
+    ]);
 
-    const byStatus: Record<string, number> = {};
-    const byCategory: Record<string, number> = {};
-    for (const c of complaints) {
-      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-      byCategory[c.category] = (byCategory[c.category] || 0) + 1;
-    }
+    const statusMap: Record<string, number> = {};
+    for (const s of byStatus) statusMap[s.status] = s._count;
 
-    const resolved = complaints.filter((c) => c.resolvedAt);
-    const avgResolutionTime = resolved.length > 0
-      ? resolved.reduce((s, c) => s + (c.resolvedAt!.getTime() - c.createdAt.getTime()), 0) / resolved.length / (1000 * 60 * 60)
+    const categoryMap: Record<string, number> = {};
+    for (const c of byCategory) categoryMap[c.category] = c._count;
+
+    const avgResolutionTime = avgResolution.length > 0
+      ? avgResolution.reduce((s, c) => s + (c.resolvedAt!.getTime() - c.createdAt.getTime()), 0) / avgResolution.length / (1000 * 60 * 60)
       : 0;
 
     return {
-      total: complaints.length,
-      byStatus,
-      byCategory,
+      total,
+      byStatus: statusMap,
+      byCategory: categoryMap,
       avgResolutionTimeHours: Math.round(avgResolutionTime * 10) / 10,
     };
   }
@@ -89,92 +132,113 @@ export class ReportsService {
   }
 
   async revenueTrend(hostelId: string, months: number = 6) {
-    const result: { month: string; collected: number; charged: number }[] = [];
+    // Clamp months to prevent excessive queries
+    const safeMonths = Math.min(months, 24);
     const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - safeMonths + 1, 1);
 
-    for (let i = months - 1; i >= 0; i--) {
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    // Single query to get all fees in the date range
+    const fees = await prisma.feeRecord.findMany({
+      where: {
+        hostelId,
+        createdAt: { gte: startDate },
+      },
+      select: { amount: true, paidAmount: true, createdAt: true },
+    });
 
-      const fees = await prisma.feeRecord.findMany({
-        where: { hostelId, createdAt: { gte: start, lte: end } },
-      });
+    // Group by month in JS
+    const result: { month: string; collected: number; charged: number }[] = [];
+    for (let i = safeMonths - 1; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+      const monthFees = fees.filter((f) => f.createdAt >= monthStart && f.createdAt <= monthEnd);
 
       result.push({
-        month: start.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        collected: fees.reduce((s, f) => s + Number(f.paidAmount), 0),
-        charged: fees.reduce((s, f) => s + Number(f.amount), 0),
+        month: monthStart.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        collected: monthFees.reduce((s, f) => s + Number(f.paidAmount), 0),
+        charged: monthFees.reduce((s, f) => s + Number(f.amount), 0),
       });
     }
 
     return result;
   }
+
   async gatePassReport(hostelId: string) {
-    const passes = await prisma.gatePass.findMany({ where: { hostelId } });
+    // Use groupBy for type and status counts
+    const [total, byType, byStatus, returnedPasses] = await Promise.all([
+      prisma.gatePass.count({ where: { hostelId } }),
+      prisma.gatePass.groupBy({ by: ['type'], where: { hostelId }, _count: true }),
+      prisma.gatePass.groupBy({ by: ['status'], where: { hostelId }, _count: true }),
+      prisma.gatePass.findMany({
+        where: { hostelId, actualReturn: { not: null } },
+        select: { exitDate: true, actualReturn: true },
+      }),
+    ]);
 
-    const byType: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
+    const typeMap: Record<string, number> = {};
+    for (const t of byType) typeMap[t.type] = t._count;
+
+    const statusMap: Record<string, number> = {};
+    for (const s of byStatus) statusMap[s.status] = s._count;
+
     let totalDurationHours = 0;
-    let returnedCount = 0;
-
-    for (const p of passes) {
-      byType[p.type] = (byType[p.type] || 0) + 1;
-      byStatus[p.status] = (byStatus[p.status] || 0) + 1;
+    for (const p of returnedPasses) {
       if (p.actualReturn && p.exitDate) {
         totalDurationHours += (new Date(p.actualReturn).getTime() - new Date(p.exitDate).getTime()) / (1000 * 60 * 60);
-        returnedCount++;
       }
     }
 
     return {
-      total: passes.length,
-      byType,
-      byStatus,
-      avgDurationHours: returnedCount > 0 ? Math.round((totalDurationHours / returnedCount) * 10) / 10 : 0,
+      total,
+      byType: typeMap,
+      byStatus: statusMap,
+      avgDurationHours: returnedPasses.length > 0 ? Math.round((totalDurationHours / returnedPasses.length) * 10) / 10 : 0,
     };
   }
 
   async visitorReport(hostelId: string) {
-    const visitors = await prisma.visitor.findMany({ where: { hostelId } });
+    const [total, currentlyInside, visitors] = await Promise.all([
+      prisma.visitor.count({ where: { hostelId } }),
+      prisma.visitor.count({ where: { hostelId, exitTime: null } }),
+      // Only load last 12 months for trend, with minimal fields
+      prisma.visitor.findMany({
+        where: {
+          hostelId,
+          entryTime: { gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) },
+        },
+        select: { entryTime: true },
+      }),
+    ]);
 
     const byMonth: Record<string, number> = {};
-    let currentlyInside = 0;
-
     for (const v of visitors) {
       const month = v.entryTime.toLocaleString('default', { month: 'short', year: 'numeric' });
       byMonth[month] = (byMonth[month] || 0) + 1;
-      if (!v.exitTime) currentlyInside++;
     }
 
-    return {
-      total: visitors.length,
-      currentlyInside,
-      byMonth,
-    };
+    return { total, currentlyInside, byMonth };
   }
 
   async messReport(hostelId: string) {
-    const bookings = await prisma.messBooking.findMany({ where: { hostelId } });
-
-    const byMealType: Record<string, { count: number; totalRating: number; ratedCount: number }> = {};
-    for (const b of bookings) {
-      if (!byMealType[b.mealType]) byMealType[b.mealType] = { count: 0, totalRating: 0, ratedCount: 0 };
-      byMealType[b.mealType].count++;
-      if (b.rating) {
-        byMealType[b.mealType].totalRating += b.rating;
-        byMealType[b.mealType].ratedCount++;
-      }
-    }
-
-    const mealStats = Object.entries(byMealType).map(([meal, data]) => ({
-      meal,
-      bookings: data.count,
-      avgRating: data.ratedCount > 0 ? Math.round((data.totalRating / data.ratedCount) * 10) / 10 : null,
-    }));
+    // Use groupBy for meal type aggregation
+    const [totalBookings, mealStats] = await Promise.all([
+      prisma.messBooking.count({ where: { hostelId, isBooked: true } }),
+      prisma.messBooking.groupBy({
+        by: ['mealType'],
+        where: { hostelId, isBooked: true },
+        _count: true,
+        _avg: { rating: true },
+      }),
+    ]);
 
     return {
-      totalBookings: bookings.length,
-      mealStats,
+      totalBookings,
+      mealStats: mealStats.map((m) => ({
+        meal: m.mealType,
+        bookings: m._count,
+        avgRating: m._avg.rating ? Math.round(m._avg.rating * 10) / 10 : null,
+      })),
     };
   }
 

@@ -112,17 +112,18 @@ export class StudentsService {
   }
 
   async checkout(id: string) {
-    const student = await prisma.studentProfile.findUnique({ where: { id } });
-    if (!student) throw new AppError(404, 'Student not found');
+    return prisma.$transaction(async (tx) => {
+      const student = await tx.studentProfile.findUnique({ where: { id } });
+      if (!student) throw new AppError(404, 'Student not found');
 
-    // Free up the bed
-    if (student.bedId) {
-      await prisma.bed.update({ where: { id: student.bedId }, data: { status: 'VACANT' } });
-    }
+      if (student.bedId) {
+        await tx.bed.update({ where: { id: student.bedId }, data: { status: 'VACANT' } });
+      }
 
-    return prisma.studentProfile.update({
-      where: { id },
-      data: { status: 'CHECKED_OUT', checkoutDate: new Date(), bedId: null },
+      return tx.studentProfile.update({
+        where: { id },
+        data: { status: 'CHECKED_OUT', checkoutDate: new Date(), bedId: null },
+      });
     });
   }
 
@@ -133,30 +134,27 @@ export class StudentsService {
   }
 
   async transfer(id: string, newBedId: string) {
-    const student = await prisma.studentProfile.findUnique({ where: { id } });
-    if (!student) throw new AppError(404, 'Student not found');
-    if (student.status !== 'APPROVED') throw new AppError(400, 'Only approved students can be transferred');
+    return prisma.$transaction(async (tx) => {
+      const student = await tx.studentProfile.findUnique({ where: { id } });
+      if (!student) throw new AppError(404, 'Student not found');
+      if (student.status !== 'APPROVED') throw new AppError(400, 'Only approved students can be transferred');
 
-    const newBed = await prisma.bed.findUnique({ where: { id: newBedId }, include: { room: true } });
-    if (!newBed) throw new AppError(404, 'Bed not found');
-    if (newBed.status === 'OCCUPIED') throw new AppError(400, 'Target bed is already occupied');
+      const newBed = await tx.bed.findUnique({ where: { id: newBedId }, include: { room: true } });
+      if (!newBed) throw new AppError(404, 'Bed not found');
+      if (newBed.status === 'OCCUPIED') throw new AppError(400, 'Target bed is already occupied');
 
-    // Vacate old bed
-    if (student.bedId) {
-      await prisma.bed.update({ where: { id: student.bedId }, data: { status: 'VACANT' } });
-    }
+      if (student.bedId) {
+        await tx.bed.update({ where: { id: student.bedId }, data: { status: 'VACANT' } });
+      }
 
-    // Assign new bed
-    await prisma.bed.update({ where: { id: newBedId }, data: { status: 'OCCUPIED' } });
+      await tx.bed.update({ where: { id: newBedId }, data: { status: 'OCCUPIED' } });
 
-    // Update student profile
-    const updated = await prisma.studentProfile.update({
-      where: { id },
-      data: { bedId: newBedId },
-      include: { bed: { include: { room: { include: { block: true } } } } },
+      return tx.studentProfile.update({
+        where: { id },
+        data: { bedId: newBedId },
+        include: { bed: { include: { room: { include: { block: true } } } } },
+      });
     });
-
-    return updated;
   }
 }
 
