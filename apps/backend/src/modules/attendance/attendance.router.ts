@@ -7,18 +7,20 @@ import * as ctrl from './attendance.controller.js';
 
 const router = Router();
 
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format');
+
 const markSchema = z.object({
   studentId: z.string().uuid(),
   hostelId: z.string().uuid(),
-  date: z.string(),
+  date: dateString,
   status: z.enum(['PRESENT', 'ABSENT', 'LATE', 'ON_LEAVE']),
   remarks: z.string().optional(),
 });
 
 const bulkMarkSchema = z.object({
-  studentIds: z.array(z.string().uuid()),
+  studentIds: z.array(z.string().uuid()).min(1),
   hostelId: z.string().uuid(),
-  date: z.string(),
+  date: dateString,
   status: z.enum(['PRESENT', 'ABSENT', 'LATE', 'ON_LEAVE']),
 });
 

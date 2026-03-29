@@ -45,17 +45,17 @@ export class AttendanceService {
     const dateObj = new Date(data.date);
     dateObj.setHours(0, 0, 0, 0);
 
-    const results = [];
-    for (const studentId of data.studentIds) {
-      const record = await this.markAttendance({
-        studentId,
-        hostelId: data.hostelId,
-        date: data.date,
-        status: data.status,
-        markedById: data.markedById,
-      });
-      results.push(record);
-    }
+    const results = await Promise.all(
+      data.studentIds.map((studentId) =>
+        this.markAttendance({
+          studentId,
+          hostelId: data.hostelId,
+          date: data.date,
+          status: data.status,
+          markedById: data.markedById,
+        }),
+      ),
+    );
     return { marked: results.length };
   }
 
