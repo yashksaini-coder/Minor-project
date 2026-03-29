@@ -38,3 +38,13 @@ export const getMonthlyReport = asyncHandler(async (req: Request, res: Response)
   const report = await messService.getMonthlyReport(req.params.hostelId, Number(req.query.month), Number(req.query.year));
   success(res, report);
 });
+
+export const calculateFee = asyncHandler(async (req: Request, res: Response) => {
+  const fee = await messService.calculateMonthlyFee(
+    req.params.studentId,
+    Number(req.query.month),
+    Number(req.query.year),
+    req.query.rate ? Number(req.query.rate) : undefined,
+  );
+  success(res, fee);
+});

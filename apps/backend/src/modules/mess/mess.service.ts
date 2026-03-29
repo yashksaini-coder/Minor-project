@@ -65,6 +65,27 @@ export class MessService {
 
     return bookings;
   }
+  async calculateMonthlyFee(studentId: string, month: number, year: number, ratePerMeal: number = 50) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const bookings = await prisma.messBooking.count({
+      where: {
+        studentId,
+        date: { gte: startDate, lte: endDate },
+        isBooked: true,
+      },
+    });
+
+    return {
+      studentId,
+      month,
+      year,
+      totalMeals: bookings,
+      ratePerMeal,
+      totalFee: bookings * ratePerMeal,
+    };
+  }
 }
 
 export const messService = new MessService();
