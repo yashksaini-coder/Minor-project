@@ -27,7 +27,8 @@ import { GettingStarted } from '@/components/shared/GettingStarted';
 import { AnimatedNumber } from '@/components/shared/AnimatedNumber';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { AreaChartWrapper } from '@/components/charts/AreaChart';
-import { FunnelChart } from '@/components/charts/FunnelChart';
+import { DonutChart } from '@/components/charts/DonutChart';
+import { ProgressRing } from '@/components/charts/ProgressRing';
 import { OccupancyGrid } from '@/components/admin/OccupancyGrid';
 import { api } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth-store';
@@ -311,14 +312,14 @@ export default function DashboardPage() {
     };
   }, [dashboard]);
 
-  const funnelData = useMemo(() => {
+  const donutData = useMemo(() => {
     if (!dashboard?.complaintBreakdown) return [];
     const bd = dashboard.complaintBreakdown;
     return [
-      { label: 'Open', value: bd.open ?? 0, color: '#ef4444' },
-      { label: 'Assigned', value: bd.assigned ?? 0, color: '#f59e0b' },
-      { label: 'In Progress', value: bd.inProgress ?? 0, color: '#3b82f6' },
-      { label: 'Resolved', value: bd.resolved ?? 0, color: '#22c55e' },
+      { name: 'Open', value: bd.open ?? 0, color: '#ef4444' },
+      { name: 'Assigned', value: bd.assigned ?? 0, color: '#f59e0b' },
+      { name: 'In Progress', value: bd.inProgress ?? 0, color: '#3b82f6' },
+      { name: 'Resolved', value: bd.resolved ?? 0, color: '#22c55e' },
     ];
   }, [dashboard]);
 
@@ -395,9 +396,9 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Revenue Chart + Complaint Funnel */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div variants={item}>
+      {/* Revenue Chart + Complaint Donut + Occupancy Ring */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <motion.div variants={item} className="lg:col-span-2">
           {revenueLoading ? (
             <Card className="rounded-xl">
               <CardContent className="p-5 space-y-3">
@@ -417,8 +418,22 @@ export default function DashboardPage() {
             />
           )}
         </motion.div>
-        <motion.div variants={item}>
-          <FunnelChart title="Complaint Funnel" data={funnelData} />
+        <motion.div variants={item} className="space-y-4">
+          <Card className="rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-display text-base">Occupancy</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center py-4">
+              <ProgressRing
+                value={stats?.occupancyRate ?? 0}
+                size={140}
+                strokeWidth={12}
+                color="#22c55e"
+                label="Beds filled"
+              />
+            </CardContent>
+          </Card>
+          <DonutChart title="Complaints by Status" data={donutData} height={220} innerRadius={45} outerRadius={75} />
         </motion.div>
       </div>
 

@@ -20,16 +20,21 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { AreaChartWrapper } from '@/components/charts/AreaChart';
 import { BarChartWrapper } from '@/components/charts/BarChart';
-import { FunnelChart } from '@/components/charts/FunnelChart';
+import { DonutChart } from '@/components/charts/DonutChart';
+import { HorizontalBarChart } from '@/components/charts/HorizontalBarChart';
+import { RadarChartWrapper } from '@/components/charts/RadarChart';
 import { api } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth-store';
 
-type ReportType = 'occupancy' | 'fees' | 'complaints';
+type ReportType = 'occupancy' | 'fees' | 'complaints' | 'gate-passes' | 'visitors' | 'mess';
 
 const reportOptions: { value: ReportType; label: string }[] = [
   { value: 'occupancy', label: 'Occupancy Report' },
   { value: 'fees', label: 'Fees Report' },
   { value: 'complaints', label: 'Complaints Report' },
+  { value: 'gate-passes', label: 'Gate Pass Report' },
+  { value: 'visitors', label: 'Visitor Report' },
+  { value: 'mess', label: 'Mess Report' },
 ];
 
 function getDefaultDateRange() {
@@ -76,21 +81,67 @@ export default function ReportsPage() {
     return reportData.trend;
   }, [reportType, reportData]);
 
-  const complaintsFunnelData = useMemo(() => {
-    if (reportType !== 'complaints' || !reportData?.breakdown) return [];
-    const bd = reportData.breakdown;
+  const complaintsDonutData = useMemo(() => {
+    if (reportType !== 'complaints' || !reportData?.byStatus) return [];
+    const bd = reportData.byStatus;
     return [
-      { label: 'Open', value: bd.open ?? 0, color: '#ef4444' },
-      { label: 'Assigned', value: bd.assigned ?? 0, color: '#f59e0b' },
-      { label: 'In Progress', value: bd.inProgress ?? 0, color: '#3b82f6' },
-      { label: 'Resolved', value: bd.resolved ?? 0, color: '#22c55e' },
-    ];
+      { name: 'Open', value: bd.OPEN ?? 0, color: '#ef4444' },
+      { name: 'Assigned', value: bd.ASSIGNED ?? 0, color: '#f59e0b' },
+      { name: 'In Progress', value: bd.IN_PROGRESS ?? 0, color: '#3b82f6' },
+      { name: 'Resolved', value: bd.RESOLVED ?? 0, color: '#22c55e' },
+      { name: 'Closed', value: bd.CLOSED ?? 0, color: '#6b7280' },
+    ].filter(d => d.value > 0);
   }, [reportType, reportData]);
 
-  function handleExport(format: 'pdf' | 'excel') {
-    toast.info(`Exporting ${reportType} report as ${format.toUpperCase()}...`);
-    // Placeholder: in production, trigger a file download from the API
-    // e.g., window.open(`${API_URL}/reports/${reportType}/export?format=${format}&...`)
+  const complaintCategoryData = useMemo(() => {
+    if (reportType !== 'complaints' || !reportData?.byCategory) return [];
+    return Object.entries(reportData.byCategory).map(([name, value]) => ({
+      name: name.replace(/_/g, ' '),
+      count: value as number,
+    }));
+  }, [reportType, reportData]);
+
+  const gatePassDonutData = useMemo(() => {
+    if (reportType !== 'gate-passes' || !reportData?.byType) return [];
+    const colors: Record<string, string> = { LOCAL: '#3b82f6', HOME: '#22c55e', EMERGENCY: '#ef4444', MEDICAL: '#f59e0b' };
+    return Object.entries(reportData.byType).map(([name, value]) => ({
+      name, value: value as number, color: colors[name] || '#6b7280',
+    }));
+  }, [reportType, reportData]);
+
+  const messBarData = useMemo(() => {
+    if (reportType !== 'mess' || !reportData?.mealStats) return [];
+    return reportData.mealStats;
+  }, [reportType, reportData]);
+
+  function handleExport(format: 'pdf' | 'csv') {
+    if (!reportData) {
+      toast.error('No report data to export');
+      return;
+    }
+
+    if (format === 'csv') {
+      let csvContent = '';
+      const summary = reportData.summary || reportData;
+      const rows = Object.entries(summary).filter(([, v]) => typeof v !== 'object');
+      csvContent += 'Metric,Value\n';
+      rows.forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').trim();
+        csvContent += `"${label}","${value}"\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${reportType}-report-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV downloaded');
+    } else {
+      window.print();
+      toast.success('Print dialog opened');
+    }
   }
 
   return (
@@ -102,11 +153,11 @@ export default function ReportsPage() {
           <div className="flex gap-2">
             <Button variant="outline" className="rounded-lg gap-1.5" onClick={() => handleExport('pdf')}>
               <FileText className="h-4 w-4" />
-              PDF
+              Print
             </Button>
-            <Button variant="outline" className="rounded-lg gap-1.5" onClick={() => handleExport('excel')}>
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
+            <Button variant="outline" className="rounded-lg gap-1.5" onClick={() => handleExport('csv')}>
+              <Download className="h-4 w-4" />
+              CSV
             </Button>
           </div>
         }
@@ -192,7 +243,42 @@ export default function ReportsPage() {
           )}
 
           {reportType === 'complaints' && (
-            <FunnelChart title="Complaints Breakdown" data={complaintsFunnelData} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <DonutChart title="Complaints by Status" data={complaintsDonutData} />
+              <RadarChartWrapper
+                title="Complaints by Category"
+                data={complaintCategoryData}
+                dataKey="count"
+                nameKey="name"
+                color="#8b5cf6"
+              />
+            </div>
+          )}
+
+          {reportType === 'gate-passes' && (
+            <DonutChart title="Gate Passes by Type" data={gatePassDonutData} />
+          )}
+
+          {reportType === 'mess' && (
+            <BarChartWrapper
+              title="Meal Bookings & Ratings"
+              data={messBarData}
+              xKey="meal"
+              yKeys={[
+                { key: 'bookings', color: '#3b82f6', label: 'Bookings' },
+              ]}
+            />
+          )}
+
+          {reportType === 'visitors' && reportData?.byMonth && (
+            <BarChartWrapper
+              title="Visitors by Month"
+              data={Object.entries(reportData.byMonth).map(([month, count]) => ({ month, visits: count }))}
+              xKey="month"
+              yKeys={[
+                { key: 'visits', color: '#8b5cf6', label: 'Visits' },
+              ]}
+            />
           )}
 
           {/* Summary Card */}
