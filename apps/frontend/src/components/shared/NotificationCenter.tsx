@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 import { Bell, Check, CheckCheck, Info, AlertTriangle, CheckCircle2, XCircle, Megaphone } from 'lucide-react';
+import { useSocketEvent } from '@/hooks/useSocket';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -48,8 +50,40 @@ export function NotificationCenter() {
       const res = await api.get('/notifications?limit=20');
       return res.data.data as { notifications: Notification[]; unreadCount: number };
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
+
+  // Real-time socket listeners
+  const handleBroadcast = useCallback((data: { title: string; message: string }) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    toast.info(data.title, { description: data.message });
+  }, [queryClient]);
+
+  const handleComplaintStatus = useCallback((data: any) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    toast.info(`Complaint: ${data.title}`, { description: `Status changed to ${data.status}` });
+  }, [queryClient]);
+
+  const handleGatePassDecision = useCallback((data: any) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    toast.info('Gate Pass Update', { description: `Your gate pass has been ${data.status?.toLowerCase()}` });
+  }, [queryClient]);
+
+  const handlePayment = useCallback((data: any) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    toast.success('Payment Recorded', { description: `Rs. ${data.amount} payment received` });
+  }, [queryClient]);
+
+  const handleNewComplaint = useCallback((data: any) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    toast.info('New Complaint', { description: data.title });
+  }, [queryClient]);
+
+  useSocketEvent('notification:broadcast', handleBroadcast);
+  useSocketEvent('complaint:statusChanged', handleComplaintStatus);
+  useSocketEvent('gatePass:decision', handleGatePassDecision);
+  useSocketEvent('fee:paymentRecorded', handlePayment);
+  useSocketEvent('complaint:new', handleNewComplaint);
 
   const markRead = useMutation({
     mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
