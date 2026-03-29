@@ -10,5 +10,9 @@ router.get('/occupancy/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'S
 router.get('/fees/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.fees);
 router.get('/complaints/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.complaints);
 router.get('/revenue-trend/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.revenueTrend);
+router.get('/gate-passes/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.gatePasses);
+router.get('/visitors/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.visitors);
+router.get('/mess/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.mess);
+router.get('/login-activity/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.loginActivity);
 
 export default router;

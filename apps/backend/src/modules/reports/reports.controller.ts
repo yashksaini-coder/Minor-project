@@ -27,3 +27,23 @@ export const revenueTrend = asyncHandler(async (req: Request, res: Response) => 
   const trend = await reportsService.revenueTrend(req.params.hostelId, Number(req.query.months) || 6);
   success(res, trend);
 });
+
+export const gatePasses = asyncHandler(async (req: Request, res: Response) => {
+  const report = await reportsService.gatePassReport(req.params.hostelId);
+  success(res, report);
+});
+
+export const visitors = asyncHandler(async (req: Request, res: Response) => {
+  const report = await reportsService.visitorReport(req.params.hostelId);
+  success(res, report);
+});
+
+export const mess = asyncHandler(async (req: Request, res: Response) => {
+  const report = await reportsService.messReport(req.params.hostelId);
+  success(res, report);
+});
+
+export const loginActivity = asyncHandler(async (req: Request, res: Response) => {
+  const report = await reportsService.loginActivityReport(req.params.hostelId);
+  success(res, report);
+});
