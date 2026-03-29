@@ -6,6 +6,7 @@ import { env } from '../../config/env.js';
 import { AppError } from '../../shared/middleware/errorHandler.js';
 import { JwtPayload } from '../../shared/middleware/authenticate.js';
 import { v4 as uuid } from 'uuid';
+import { sendPasswordResetEmail } from '../../config/mailer.js';
 
 export class AuthService {
   async login(email: string, password: string, ipAddress: string, userAgent: string) {
@@ -165,7 +166,7 @@ export class AuthService {
 
     const resetToken = uuid();
     await redis.set(`pwd-reset:${resetToken}`, user.id, 'EX', 60 * 30); // 30 min
-    // TODO: Send email with reset link
+    await sendPasswordResetEmail(email, resetToken);
     return resetToken; // In production, don't return this
   }
 
