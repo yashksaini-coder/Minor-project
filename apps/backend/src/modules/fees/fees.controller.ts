@@ -36,3 +36,10 @@ export const getStudentBalance = asyncHandler(async (req: Request, res: Response
   const balance = await feesService.getStudentBalance(req.params.studentId);
   success(res, balance);
 });
+
+export const getReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const html = await feesService.generateReceipt(req.params.id);
+  res.setHeader('Content-Type', 'text/html');
+  res.setHeader('Content-Disposition', `inline; filename="receipt-${req.params.id.slice(0, 8)}.html"`);
+  res.send(html);
+});

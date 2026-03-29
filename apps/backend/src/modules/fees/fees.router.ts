@@ -32,5 +32,6 @@ const waiveSchema = z.object({
 });
 
 router.patch('/:id/waive', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), validate(waiveSchema), ctrl.waive);
+router.get('/:id/receipt', authenticate, ctrl.getReceipt);
 
 export default router;
