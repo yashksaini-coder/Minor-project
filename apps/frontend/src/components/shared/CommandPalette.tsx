@@ -3,11 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Command } from 'cmdk';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   LayoutDashboard, Users, BedDouble, AlertTriangle, Receipt,
   UtensilsCrossed, BarChart3, DoorOpen, User, UserCheck, Settings,
-  Search, ArrowRight,
+  Search, ArrowRight, X,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -48,6 +47,7 @@ const staffCommands: CommandItem[] = [
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const router = useRouter();
   const { user } = useAuthStore();
 
@@ -77,6 +77,7 @@ export function CommandPalette() {
 
   const runCommand = (href: string) => {
     setOpen(false);
+    setSearch('');
     router.push(href);
   };
 
@@ -85,43 +86,89 @@ export function CommandPalette() {
     return acc;
   }, {});
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="overflow-hidden p-0 rounded-2xl shadow-2xl border-border/50 max-w-lg">
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-item]]:rounded-lg [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2.5 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4">
-          <div className="flex items-center border-b border-border px-3">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in-0 duration-150"
+        onClick={() => { setOpen(false); setSearch(''); }}
+      />
+
+      {/* Dialog */}
+      <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-full max-w-[520px] px-4 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-150">
+        <Command
+          className="rounded-2xl border border-border/60 bg-popover shadow-2xl overflow-hidden"
+          shouldFilter={true}
+        >
+          {/* Search input */}
+          <div className="flex items-center gap-2 px-4 border-b border-border/50">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground/60" />
             <Command.Input
+              value={search}
+              onValueChange={setSearch}
               placeholder="Search pages, actions..."
-              className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
             />
-            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-              ESC
-            </kbd>
+            <button
+              onClick={() => { setOpen(false); setSearch(''); }}
+              className="shrink-0 flex items-center justify-center h-6 w-6 rounded-md bg-muted/80 hover:bg-muted text-muted-foreground/70 hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </div>
-          <Command.List className="max-h-[300px] overflow-y-auto p-2">
-            <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+
+          {/* Results */}
+          <Command.List className="max-h-[320px] overflow-y-auto overscroll-contain p-1.5 scrollbar-thin">
+            <Command.Empty className="py-10 text-center text-sm text-muted-foreground/60">
               No results found.
             </Command.Empty>
+
             {Object.entries(grouped).map(([group, items]) => (
-              <Command.Group key={group} heading={group} className="text-xs uppercase tracking-wider text-muted-foreground pb-1 pt-2">
+              <Command.Group
+                key={group}
+                heading={group}
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground/50"
+              >
                 {items.map((item) => (
                   <Command.Item
                     key={item.href}
                     value={`${item.label} ${item.keywords || ''}`}
                     onSelect={() => runCommand(item.href)}
-                    className="flex items-center gap-3 cursor-pointer data-[selected=true]:bg-accent/50 transition-colors"
+                    className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm cursor-pointer transition-colors duration-100 text-foreground/80 data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground aria-selected:bg-primary/10 aria-selected:text-foreground"
                   >
-                    <item.icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1">{item.label}</span>
-                    <ArrowRight className="h-3 w-3 opacity-0 group-data-[selected=true]:opacity-100 text-muted-foreground" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 group-data-[selected=true]:bg-primary/15 group-aria-selected:bg-primary/15 transition-colors">
+                      <item.icon className="h-4 w-4 text-muted-foreground group-data-[selected=true]:text-primary group-aria-selected:text-primary transition-colors" />
+                    </div>
+                    <span className="flex-1 font-medium">{item.label}</span>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 opacity-0 group-data-[selected=true]:opacity-100 group-aria-selected:opacity-100 transition-opacity" />
                   </Command.Item>
                 ))}
               </Command.Group>
             ))}
           </Command.List>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-border/50 px-4 py-2 text-[11px] text-muted-foreground/50">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded bg-muted/70 px-1 font-mono text-[10px]">↑</kbd>
+                <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded bg-muted/70 px-1 font-mono text-[10px]">↓</kbd>
+                navigate
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded bg-muted/70 px-1 font-mono text-[10px]">↵</kbd>
+                select
+              </span>
+            </div>
+            <span className="flex items-center gap-1">
+              <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded bg-muted/70 px-1 font-mono text-[10px]">esc</kbd>
+              close
+            </span>
+          </div>
         </Command>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
