@@ -180,54 +180,42 @@ campusphere/
 - **pnpm** >= 10
 - **Docker** & Docker Compose
 
-### 1. Clone & Install
+### Quick Start (one command)
 
 ```bash
 git clone https://github.com/your-username/campusphere.git
 cd campusphere
+bash setup.sh
+```
+
+This single command will:
+1. Check prerequisites (Node.js 18+, pnpm, Docker)
+2. Install all dependencies
+3. Create `.env` from template
+4. Start PostgreSQL + Redis via Docker
+5. Run database migrations
+6. Seed with demo data (2 hostels, 40 students, complaints, fees, events, etc.)
+7. Launch frontend + backend dev servers
+
+### Manual Setup
+
+If you prefer step-by-step:
+
+```bash
+# 1. Install dependencies
 pnpm install
-```
 
-### 2. Start Infrastructure
+# 2. Start infrastructure
+pnpm docker:up
 
-```bash
-docker compose up -d
-```
-
-This starts:
-- **PostgreSQL 16** on `localhost:5432`
-- **Redis 7** on `localhost:6379`
-
-### 3. Configure Environment
-
-```bash
+# 3. Setup environment
 cp apps/backend/.env.example apps/backend/.env
-```
 
-Default `.env` values work out of the box with Docker Compose:
+# 4. Run migrations + seed
+pnpm db:migrate
+pnpm db:seed
 
-```env
-DATABASE_URL="postgresql://campusphere:campusphere_dev_password@localhost:5432/campusphere?schema=public"
-REDIS_URL="redis://localhost:6379"
-JWT_SECRET="campusphere-dev-jwt-secret-change-in-production"
-PORT=4000
-CORS_ORIGIN="http://localhost:3000"
-```
-
-### 4. Setup Database
-
-```bash
-# Run migrations
-cd apps/backend && npx prisma migrate dev
-
-# Seed test data
-npx prisma db seed
-```
-
-### 5. Start Development
-
-```bash
-# From the root — starts both frontend & backend
+# 5. Start dev servers
 pnpm dev
 ```
 
@@ -241,9 +229,14 @@ pnpm dev
 
 | Role | Email | Password |
 |:--|:--|:--|
-| Admin | `admin@campusphere.edu` | `admin123` |
-| Warden | `warden@campusphere.edu` | `warden123` |
-| Staff | `staff@campusphere.edu` | `staff123` |
+| Super Admin | `dean@campusphere.edu` | `admin123` |
+| Admin (Boys) | `admin@campusphere.edu` | `admin123` |
+| Admin (Girls) | `admin.girls@campusphere.edu` | `admin123` |
+| Warden (Boys) | `warden@campusphere.edu` | `warden123` |
+| Warden (Girls) | `warden.girls@campusphere.edu` | `warden123` |
+| Staff | `ramesh.yadav@campusphere.edu` | `staff123` |
+| Student (M) | `cs2024001@student.edu` | `student123` |
+| Student (F) | `cs2024f01@student.edu` | `student123` |
 
 ---
 
@@ -251,21 +244,26 @@ pnpm dev
 
 | Command | Description |
 |:--|:--|
+| `bash setup.sh` | One-command full setup + launch |
 | `pnpm dev` | Start all apps in dev mode (Turborepo) |
-| `pnpm build` | Build all apps |
+| `pnpm build` | Build all apps for production |
 | `pnpm lint` | Lint all apps |
-| `docker compose up -d` | Start PostgreSQL & Redis |
-| `docker compose down` | Stop infrastructure |
-| `cd apps/backend && npx prisma migrate dev` | Run database migrations |
-| `cd apps/backend && npx prisma db seed` | Seed database with test data |
-| `cd apps/backend && npx prisma studio` | Open database GUI |
-| `cd apps/backend && npx prisma generate` | Regenerate Prisma client |
+| `pnpm docker:up` | Start PostgreSQL & Redis containers |
+| `pnpm docker:down` | Stop infrastructure containers |
+| `pnpm db:migrate` | Run database migrations (dev) |
+| `pnpm db:migrate:deploy` | Apply migrations (production) |
+| `pnpm db:seed` | Seed database with demo data |
+| `pnpm db:studio` | Open Prisma Studio database GUI |
+| `pnpm db:reset` | Reset database (drop + recreate + seed) |
+| `pnpm typecheck` | Type-check all apps |
+| `pnpm typecheck:backend` | Type-check backend only |
+| `pnpm typecheck:frontend` | Type-check frontend only |
 
 ---
 
 ## Database Schema
 
-16 models across the following domains:
+19 models across the following domains:
 
 | Model | Description |
 |:--|:--|
@@ -285,6 +283,9 @@ pnpm dev
 | `Notification` | In-app notifications with read tracking |
 | `LoginHistory` | Security audit trail |
 | `AuditLog` | Entity-level change tracking |
+| `Attendance` | Daily student attendance with check-in/out times |
+| `Event` | Hostel events with venue, capacity, and categories |
+| `EventRsvp` | Student RSVP status for events |
 
 ---
 
