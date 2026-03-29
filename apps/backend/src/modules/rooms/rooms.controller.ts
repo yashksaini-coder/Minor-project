@@ -4,7 +4,12 @@ import { asyncHandler } from '../../shared/utils/asyncHandler.js';
 import { success } from '../../shared/utils/apiResponse.js';
 
 export const listRooms = asyncHandler(async (req: Request, res: Response) => {
-  const result = await roomsService.listRooms(req.query as any);
+  const result = await roomsService.listRooms({
+    ...req.query as any,
+    page: req.query.page ? Number(req.query.page) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+    floor: req.query.floor ? Number(req.query.floor) : undefined,
+  });
   success(res, result.rooms, 'Rooms retrieved', 200, result.meta);
 });
 

@@ -4,7 +4,11 @@ import { asyncHandler } from '../../shared/utils/asyncHandler.js';
 import { success } from '../../shared/utils/apiResponse.js';
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
-  const result = await notificationsService.list(req.user!.userId, req.query as any);
+  const result = await notificationsService.list(req.user!.userId, {
+    page: req.query.page ? Number(req.query.page) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+    unreadOnly: req.query.unreadOnly === 'true',
+  });
   success(res, { notifications: result.notifications, unreadCount: result.unreadCount }, 'Notifications retrieved', 200, result.meta);
 });
 

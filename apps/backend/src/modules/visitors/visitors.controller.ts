@@ -4,7 +4,11 @@ import { asyncHandler } from '../../shared/utils/asyncHandler.js';
 import { success } from '../../shared/utils/apiResponse.js';
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
-  const result = await visitorsService.list(req.query as any);
+  const result = await visitorsService.list({
+    ...req.query as any,
+    page: req.query.page ? Number(req.query.page) : undefined,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+  });
   success(res, result.visitors, 'Visitors retrieved', 200, result.meta);
 });
 
