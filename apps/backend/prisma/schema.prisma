@@ -174,6 +174,8 @@ model User {
   approvedGatePasses GatePass[]    @relation("ApprovedGatePasses")
   loggedVisitors     Visitor[]     @relation("LoggedVisitors")
   markedAttendances  Attendance[]  @relation("MarkedByUser")
+  createdEvents      Event[]       @relation("CreatedEvents")
+  eventRsvps         EventRsvp[]
 
   @@index([email])
   @@index([role])
@@ -234,6 +236,7 @@ model Hostel {
   gatePasses   GatePass[]
   visitors     Visitor[]
   attendances  Attendance[]
+  events       Event[]
 
   @@map("hostels")
 }
@@ -517,4 +520,58 @@ enum AttendanceStatus {
   ABSENT
   LATE
   ON_LEAVE
+}
+
+// Event Management
+model Event {
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  venue       String
+  date        DateTime
+  endDate     DateTime?
+  capacity    Int?
+  imageUrl    String?
+  category    EventCategory @default(GENERAL)
+  hostelId    String
+  createdById String
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  hostel    Hostel      @relation(fields: [hostelId], references: [id])
+  createdBy User        @relation("CreatedEvents", fields: [createdById], references: [id])
+  rsvps     EventRsvp[]
+
+  @@index([hostelId, date])
+  @@map("events")
+}
+
+model EventRsvp {
+  id        String     @id @default(uuid())
+  eventId   String
+  userId    String
+  status    RsvpStatus @default(GOING)
+  createdAt DateTime   @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_rsvps")
+}
+
+enum EventCategory {
+  GENERAL
+  CULTURAL
+  SPORTS
+  ACADEMIC
+  FESTIVAL
+  MEETING
+}
+
+enum RsvpStatus {
+  GOING
+  MAYBE
+  NOT_GOING
 }
