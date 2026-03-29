@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api/client';
 import { toast } from 'sonner';
-import { Phone, LayoutDashboard, BedDouble, Receipt, AlertTriangle, UtensilsCrossed, DoorOpen, User, CalendarDays } from 'lucide-react';
+import { Phone, LayoutDashboard, BedDouble, Receipt, AlertTriangle, UtensilsCrossed, DoorOpen, User, CalendarDays, ShieldAlert, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,8 @@ const navItems: NavItem[] = [
   { label: 'Mess', href: '/student/mess', icon: UtensilsCrossed },
   { label: 'Gate Pass', href: '/student/gate-pass', icon: DoorOpen },
   { label: 'Attendance', href: '/student/attendance', icon: CalendarDays },
+  { label: 'Events', href: '/student/events', icon: Calendar },
+  { label: 'Emergency', href: '/student/emergency', icon: ShieldAlert },
   { label: 'Profile', href: '/student/profile', icon: User },
 ];
 

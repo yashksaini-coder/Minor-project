@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ColumnDef } from '@tanstack/react-table';
-import { Receipt, Download, DollarSign } from 'lucide-react';
+import Script from 'next/script';
+import { Receipt, Download, DollarSign, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { api } from '@/lib/api/client';
@@ -34,9 +35,14 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   Waived: 'outline',
 };
 
+declare global {
+  interface Window { Razorpay: any; }
+}
+
 export default function StudentFeesPage() {
   const user = useAuthStore((s) => s.user);
   const studentId = user?.studentProfile?.id;
+  const queryClient = useQueryClient();
 
   const { data: fees, isLoading: feesLoading } = useQuery({
     queryKey: ['student-fees', studentId],
@@ -49,6 +55,46 @@ export default function StudentFeesPage() {
     queryFn: () => api.get(`/fees/student/${studentId}/balance`).then((r) => r.data.data),
     enabled: !!studentId,
   });
+
+  const handlePayNow = async (fee: Fee) => {
+    try {
+      const res = await api.post(`/fees/${fee.id}/create-order`);
+      const order = res.data.data;
+
+      const options = {
+        key: order.key,
+        amount: order.amount * 100,
+        currency: order.currency,
+        name: 'Campusphere',
+        description: `${fee.type} Payment`,
+        order_id: order.orderId,
+        handler: async (response: any) => {
+          try {
+            await api.post(`/fees/${fee.id}/verify-payment`, {
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            toast.success('Payment successful!');
+            queryClient.invalidateQueries({ queryKey: ['student-fees'] });
+            queryClient.invalidateQueries({ queryKey: ['student-balance'] });
+          } catch {
+            toast.error('Payment verification failed');
+          }
+        },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+        },
+        theme: { color: '#3b82f6' },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch {
+      toast.error('Failed to initiate payment. Payment gateway may not be configured.');
+    }
+  };
 
   const handleDownloadReceipt = async (fee: Fee) => {
     try {
@@ -107,21 +153,27 @@ export default function StudentFeesPage() {
       {
         id: 'actions',
         header: '',
-        cell: ({ row }) =>
-          row.original.status === 'Paid' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDownloadReceipt(row.original)}
-              className="gap-1.5"
-            >
-              <Download className="h-4 w-4" />
-              Receipt
-            </Button>
-          ) : null,
+        cell: ({ row }) => {
+          const fee = row.original;
+          if (fee.status === 'Paid') {
+            return (
+              <Button variant="ghost" size="sm" onClick={() => handleDownloadReceipt(fee)} className="gap-1.5">
+                <Download className="h-4 w-4" />Receipt
+              </Button>
+            );
+          }
+          if (fee.status === 'Pending' || fee.status === 'Overdue' || fee.status === 'Partially Paid') {
+            return (
+              <Button size="sm" onClick={() => handlePayNow(fee)} className="gap-1.5 rounded-lg">
+                <CreditCard className="h-4 w-4" />Pay Now
+              </Button>
+            );
+          }
+          return null;
+        },
       },
     ],
-    []
+    [user, queryClient]
   );
 
   return (
@@ -131,7 +183,8 @@ export default function StudentFeesPage() {
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      <PageHeader title="Fees" description="View your fee history and download receipts" />
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      <PageHeader title="Fees" description="View your fee history and pay online" />
 
       {/* Balance summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

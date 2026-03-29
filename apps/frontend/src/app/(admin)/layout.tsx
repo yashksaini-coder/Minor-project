@@ -5,7 +5,7 @@ import { Topbar } from '@/components/shared/Topbar';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import {
   LayoutDashboard, Users, BedDouble, AlertTriangle, Receipt,
-  UtensilsCrossed, DoorOpen, UserCheck, BarChart3, Settings,
+  UtensilsCrossed, DoorOpen, UserCheck, BarChart3, Settings, Calendar,
 } from 'lucide-react';
 
 const navItems: NavItem[] = [
@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { label: 'Mess', href: '/admin/mess', icon: UtensilsCrossed },
   { label: 'Gate Passes', href: '/admin/gate-passes', icon: DoorOpen },
   { label: 'Visitors', href: '/admin/visitors', icon: UserCheck },
+  { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
