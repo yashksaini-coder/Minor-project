@@ -38,5 +38,6 @@ router.post('/cancel', authenticate, validate(cancelSchema), ctrl.cancelMeal);
 router.patch('/bookings/:bookingId/feedback', authenticate, validate(feedbackSchema), ctrl.submitFeedback);
 router.get('/bookings/:studentId', authenticate, ctrl.getBookings);
 router.get('/report/:hostelId', authenticate, authorize('ADMIN', 'WARDEN', 'SUPER_ADMIN'), ctrl.getMonthlyReport);
+router.get('/fee/:studentId', authenticate, ctrl.calculateFee);
 
 export default router;
