@@ -19,6 +19,7 @@ import usersRouter from './modules/users/users.router.js';
 import hostelsRouter from './modules/hostels/hostels.router.js';
 import auditLogsRouter from './modules/audit-logs/audit-logs.router.js';
 import attendanceRouter from './modules/attendance/attendance.router.js';
+import eventsRouter from './modules/events/events.router.js';
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/hostels', hostelsRouter);
 app.use('/api/v1/audit-logs', auditLogsRouter);
 app.use('/api/v1/attendance', attendanceRouter);
+app.use('/api/v1/events', eventsRouter);
 
 app.use(errorHandler);
 
