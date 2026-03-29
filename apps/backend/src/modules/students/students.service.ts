@@ -21,13 +21,17 @@ export class StudentsService {
       }),
     };
 
+    const allowedSortFields = ['createdAt', 'updatedAt', 'rollNumber', 'department', 'year', 'status'] as const;
+    const sortBy = allowedSortFields.includes(query.sortBy as any) ? query.sortBy! : 'createdAt';
+    const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+
     const [students, total] = await Promise.all([
       prisma.studentProfile.findMany({
         where,
         include: { user: { select: { id: true, email: true, name: true, phone: true, role: true, avatarUrl: true, isActive: true, hostelId: true, createdAt: true, updatedAt: true } }, bed: { include: { room: { include: { block: true } } } } },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' },
+        orderBy: { [sortBy]: sortOrder },
       }),
       prisma.studentProfile.count({ where }),
     ]);
