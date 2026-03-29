@@ -49,6 +49,34 @@ export class UsersService {
 
     return { users, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
+  async create(data: { email: string; password: string; name: string; phone?: string; role: string; hostelId: string }) {
+    const bcrypt = await import('bcryptjs');
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw new Error('Email already registered');
+
+    const hashed = await bcrypt.default.hash(data.password, 12);
+    const user = await prisma.user.create({
+      data: { ...data, password: hashed, role: data.role as any },
+      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, hostelId: true, createdAt: true },
+    });
+    return user;
+  }
+
+  async update(id: string, data: { name?: string; phone?: string; role?: string; isActive?: boolean }) {
+    return prisma.user.update({
+      where: { id },
+      data: { ...data, ...(data.role && { role: data.role as any }) },
+      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, hostelId: true, updatedAt: true },
+    });
+  }
+
+  async deactivate(id: string) {
+    return prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+      select: { id: true, email: true, name: true, isActive: true },
+    });
+  }
 }
 
 export const usersService = new UsersService();

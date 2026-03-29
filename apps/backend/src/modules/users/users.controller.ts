@@ -12,3 +12,18 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
   });
   success(res, result.users, 'Success', 200, result.meta);
 });
+
+export const create = asyncHandler(async (req: Request, res: Response) => {
+  const user = await usersService.create(req.body);
+  success(res, user, 'User created', 201);
+});
+
+export const update = asyncHandler(async (req: Request, res: Response) => {
+  const user = await usersService.update(req.params.id, req.body);
+  success(res, user, 'User updated');
+});
+
+export const deactivate = asyncHandler(async (req: Request, res: Response) => {
+  const user = await usersService.deactivate(req.params.id);
+  success(res, user, 'User deactivated');
+});
