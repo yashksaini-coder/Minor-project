@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { api } from '@/lib/api/client';
+import { useAuthStore } from '@/stores/auth-store';
 import {
   Settings, Users, Bell, CreditCard, Shield,
   MoreHorizontal, UserPlus, Monitor, Smartphone,
@@ -163,13 +166,54 @@ function roleBadgeVariant(role: string) {
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<string>('general');
+  const hostelId = useAuthStore((s) => s.user?.hostelId);
+  const queryClient = useQueryClient();
+
+  // Fetch hostel data
+  const { data: hostel } = useQuery({
+    queryKey: ['hostel', hostelId],
+    queryFn: async () => {
+      const res = await api.get(`/hostels/${hostelId}`);
+      return res.data.data;
+    },
+    enabled: !!hostelId,
+  });
+
+  // Fetch team members
+  const { data: teamData } = useQuery({
+    queryKey: ['users', hostelId],
+    queryFn: async () => {
+      const res = await api.get('/users', { params: { hostelId } });
+      return res.data.data;
+    },
+    enabled: !!hostelId,
+  });
+
+  // Fetch login sessions
+  const { data: sessionsData } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: async () => {
+      const res = await api.get('/auth/sessions');
+      return res.data.data;
+    },
+  });
 
   // General state
-  const [hostelName, setHostelName] = useState(mockHostel.name);
-  const [hostelCode, setHostelCode] = useState(mockHostel.code);
-  const [hostelAddress, setHostelAddress] = useState(mockHostel.address);
-  const [gender, setGender] = useState(mockHostel.gender);
-  const [warden, setWarden] = useState(mockHostel.warden);
+  const [hostelName, setHostelName] = useState('');
+  const [hostelCode, setHostelCode] = useState('');
+  const [hostelAddress, setHostelAddress] = useState('');
+  const [gender, setGender] = useState('');
+  const [warden, setWarden] = useState('');
+
+  useEffect(() => {
+    if (hostel) {
+      setHostelName(hostel.name || '');
+      setHostelCode(hostel.code || '');
+      setHostelAddress(hostel.address || '');
+      setGender(hostel.gender?.toLowerCase() || '');
+      setWarden(hostel.wardenId || '');
+    }
+  }, [hostel]);
 
   // Team state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -191,9 +235,40 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
 
+  // Mutations
+  const updateHostelMutation = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/hostels/${hostelId}`, {
+        name: hostelName,
+        address: hostelAddress,
+        ...(warden && { wardenId: warden }),
+      });
+    },
+    onSuccess: () => {
+      toast.success('General settings saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['hostel', hostelId] });
+    },
+    onError: () => toast.error('Failed to save settings'),
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+    },
+    onSuccess: () => {
+      toast.success('Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    },
+  });
+
   // Handlers
   function handleSaveGeneral() {
-    toast.success('General settings saved successfully');
+    updateHostelMutation.mutate();
   }
 
   function handleInvite() {
@@ -220,16 +295,37 @@ export default function SettingsPage() {
       toast.error('New passwords do not match');
       return;
     }
-    toast.success('Password changed successfully');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    changePasswordMutation.mutate();
   }
 
   function handleRevokeAllSessions() {
     toast.success('All other sessions have been revoked');
     setRevokeDialogOpen(false);
   }
+
+  const teamMembers = (teamData || []).map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role === 'SUPER_ADMIN' ? 'Admin' : u.role.charAt(0) + u.role.slice(1).toLowerCase(),
+    status: u.isActive ? 'Active' : 'Inactive',
+    avatar: u.avatarUrl || '',
+    initials: u.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '??',
+  }));
+
+  const sessions = (sessionsData || mockSessions).map((s: any, i: number) => ({
+    id: s.id || String(i),
+    browser: s.userAgent?.split(' ')[0] || 'Unknown Browser',
+    os: s.userAgent || 'Unknown',
+    ip: s.ipAddress || 'Unknown',
+    lastActive: i === 0 ? 'Active now' : s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Unknown',
+    current: i === 0,
+    icon: i === 0 ? Monitor : i === 1 ? Laptop : Tablet,
+  }));
 
   // -------------------------------------------------------------------------
   // Tab content renderers
@@ -295,7 +391,7 @@ export default function SettingsPage() {
                     <SelectValue placeholder="Select warden" />
                   </SelectTrigger>
                   <SelectContent>
-                    {wardens.map((w) => (
+                    {(teamData || []).filter((u: any) => u.role === 'WARDEN' || u.role === 'ADMIN').map((w: any) => (
                       <SelectItem key={w.id} value={w.id}>
                         {w.name}
                       </SelectItem>
@@ -335,7 +431,7 @@ export default function SettingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teamMembers.map((member) => (
+                {teamMembers.map((member: any) => (
                   <TableRow key={member.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -756,7 +852,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockSessions.map((session) => {
+            {sessions.map((session: any, idx: number) => {
               const Icon = session.icon;
               return (
                 <div key={session.id}>
@@ -782,7 +878,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                  {session.id !== mockSessions[mockSessions.length - 1].id && (
+                  {idx !== sessions.length - 1 && (
                     <Separator className="mt-4" />
                   )}
                 </div>
